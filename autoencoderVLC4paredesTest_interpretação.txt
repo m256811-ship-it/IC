@@ -1,0 +1,12 @@
+Validação da convergência espacial
+
+Foi realizado um teste de convergência para verificar se a discretização das paredes em patches produz uma resposta de canal estável à medida que a resolução espacial aumenta. Foram testados diferentes valores de `patchesPerMeter`, mantendo fixas as posições e orientações de TX e RX.
+
+O teste avaliou separadamente:
+- a independência do componente LoS em relação à discretização das paredes;
+- a convergência do componente NLoS por meio do ganho total do canal e do RMS delay spread;
+- a estabilidade do canal completo LoS + NLoS.
+
+Os resultados mostraram que as variações entre resoluções sucessivas diminuem progressivamente. Para o NLoS, a variação do ganho total caiu para aproximadamente **0,026%** entre 20 e 40 patches/m, enquanto a variação do RMS delay spread ficou em aproximadamente **0,031%**. No canal completo, a diferença entre 20 e 40 patches/m foi de apenas **0,010%**.
+
+Conclui-se que a discretização espacial apresenta boa convergência e que, a partir de aproximadamente **10–20 patches/m**, o refinamento adicional da malha produz alterações muito pequenas na resposta do canal.
