@@ -1,64 +1,135 @@
 function h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
-    h_vector, params, TP1, RP, WP, dA, m, FOV,G_Con, wallAxis)
-
+    h_vector, params, TP1, RP, WP, nPatch, dA, ...
+    m, FOV, G_Con, nTx, nRx)
 %ADDSINGLENLOSPATH_CHANNELMODELINGSLIDES
 %
-% Calcula a contribuição TX -> parede -> RX para um único patch WP.
+% Calcula a contribuicao de primeira reflexao:
+%
+%   TX -> patch -> RX
+%
+% usando geometria vetorial geral.
 
-%% TX -> WALL
+    %% Garantir vetores coluna
 
-D_tx_wall = sqrt(dot(TP1 - WP, TP1 - WP));
+    TP1 = TP1(:);
+    RP = RP(:);
+    WP = WP(:);
 
-if D_tx_wall == 0
-    return;
-end
+    nTx = nTx(:);
+    nRx = nRx(:);
+    nPatch = nPatch(:);
 
-cos_phi_tx_wall = abs(WP(3) - TP1(3)) / D_tx_wall;
+    %% ============================================================
+    %  TX -> PATCH
+    % =============================================================
 
-if wallAxis == "x"
-    cos_alpha_wall = abs(TP1(1) - WP(1)) / D_tx_wall;
-elseif wallAxis == "y"
-    cos_alpha_wall = abs(TP1(2) - WP(2)) / D_tx_wall;
-else
-    error('wallAxis deve ser "x" ou "y".');
-end
+    vTxPatch = WP - TP1;
 
+    D_tx_patch = norm(vTxPatch);
 
-%% WALL -> RX
+    if D_tx_patch == 0
+        return;
+    end
 
-D_wall_rx = sqrt(dot(WP - RP, WP - RP));
+    uTxPatch = vTxPatch / D_tx_patch;
 
-if D_wall_rx == 0
-    return;
-end
+    %% Angulo de irradiacao do TX
 
-if wallAxis == "x"
-    cos_beta_wall = abs(WP(1) - RP(1)) / D_wall_rx;
-elseif wallAxis == "y"
-    cos_beta_wall = abs(WP(2) - RP(2)) / D_wall_rx;
-end
+    cos_phi = dot(nTx, uTxPatch);
 
-cos_psi_wall_rx = abs(WP(3) - RP(3)) / D_wall_rx;
+    %% Angulo de incidencia no patch
 
-cos_psi_wall_rx = max(min(cos_psi_wall_rx, 1), -1);
+    % Vetor visto pelo patch apontando para o TX
+    cos_alpha = dot(nPatch, -uTxPatch);
 
+    %% ============================================================
+    %  PATCH -> RX
+    % =============================================================
 
-%% FOV
+    vPatchRx = RP - WP;
 
-if abs(acos(cos_psi_wall_rx)) <= FOV
+    D_patch_rx = norm(vPatchRx);
 
-    H_patch = (m+1)*params.Tsc * G_Con*params.Adet*params.rho*dA * ...
-        (cos_phi_tx_wall^m) * ...
-        cos_alpha_wall * ...
-        cos_beta_wall * ...
-        cos_psi_wall_rx / ...
-        (2*pi^2 * D_tx_wall^2 * D_wall_rx^2);
+    if D_patch_rx == 0
+        return;
+    end
 
-    tau_NLOS = (D_tx_wall + D_wall_rx)/params.C;
+    uPatchRx = vPatchRx / D_patch_rx;
+
+    %% Angulo de saida/reflexao do patch
+
+    cos_beta = dot(nPatch, uPatchRx);
+
+    %% Angulo de incidencia no RX
+
+    % Vetor visto pelo receptor apontando para o patch
+    cos_psi = dot(nRx, -uPatchRx);
+
+    %% ============================================================
+    %  Protecao numerica
+    % =============================================================
+
+    cos_phi   = max(-1, min(1, cos_phi));
+    cos_alpha = max(-1, min(1, cos_alpha));
+    cos_beta  = max(-1, min(1, cos_beta));
+    cos_psi   = max(-1, min(1, cos_psi));
+
+    %% ============================================================
+    %  Validacao geometrica
+    % =============================================================
+
+    % Todos os caminhos precisam estar no hemisferio fisicamente valido
+
+    if cos_phi <= 0 || ...
+       cos_alpha <= 0 || ...
+       cos_beta <= 0 || ...
+       cos_psi <= 0
+
+        return;
+    end
+
+    %% ============================================================
+    %  FOV do receptor
+    % =============================================================
+
+    psi = acos(cos_psi);
+
+    if psi > FOV
+        return;
+    end
+
+    %% ============================================================
+    %  Ganho NLOS do patch
+    % =============================================================
+
+    H_patch = ...
+        (m+1) * ...
+        params.Tsc * ...
+        G_Con * ...
+        params.Adet * ...
+        params.rho * ...
+        dA * ...
+        (cos_phi^m) * ...
+        cos_alpha * ...
+        cos_beta * ...
+        cos_psi / ...
+        (2*pi^2 * D_tx_patch^2 * D_patch_rx^2);
+
+    %% ============================================================
+    %  Atraso do caminho
+    % =============================================================
+
+    tau_NLOS = ...
+        (D_tx_patch + D_patch_rx) / params.C;
+
+    %% ============================================================
+    %  Adicionar caminho a h(t)
+    % =============================================================
 
     h_vector = addPathLinear_ChannelModelingSlides( ...
-        h_vector, H_patch, tau_NLOS, params.delta_t_ns);
-
-end
+        h_vector, ...
+        H_patch, ...
+        tau_NLOS, ...
+        params.delta_t_ns);
 
 end

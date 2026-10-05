@@ -28,9 +28,7 @@ function [hFIR, tFIR_ns] = generateVLCChannelH_ChannelModelingSlides(params, TP1
 
     % Field of View em radianos
     FOV = deg2rad(params.FOV_deg);
-
-    % Ganho do concentrador óptico - não estamos usando porque usamos lens
-    % (abordagem indicada no código dos slides da aula)
+    
     G_Con = (params.indexLens^2)/(sin(FOV)^2);
 
     % Tempo de símbolo usado para formar o canal discreto final.
@@ -57,14 +55,6 @@ function [hFIR, tFIR_ns] = generateVLCChannelH_ChannelModelingSlides(params, TP1
         params.rxYaw_deg, ...
         params.n0Rx);
 
-
-    %% ============================================================
-    %   Discretização da sala e da parede
-    % =============================================================
-
-    [x, y, z, Nx, Ny, Nz, dA] = discretizeWall_ChannelModelingSlides(params);
-
-
     %% ============================================================
     %   Inicialização temporal do canal
     % =============================================================
@@ -87,6 +77,10 @@ function [hFIR, tFIR_ns] = generateVLCChannelH_ChannelModelingSlides(params, TP1
         
         % Distancia TX -> RX
         D1 = norm(vTxRx);
+
+        if D1 == 0
+            error('As posições de TX e RX não podem ser iguais.');
+        end
         
         % Vetor unitario TX -> RX
         uTxRx = vTxRx / D1;
@@ -102,6 +96,8 @@ function [hFIR, tFIR_ns] = generateVLCChannelH_ChannelModelingSlides(params, TP1
         %Visualização de phi e psi em grau 
         phi_deg = acosd(cosphi);
         psi_deg = acosd(cospsi);
+
+        fprintf('phi = %.2f deg | psi = %.2f deg\n', phi_deg, psi_deg);
 
         % Atraso LOS, em ns
         tau0 = D1/params.C;
@@ -129,83 +125,40 @@ function [hFIR, tFIR_ns] = generateVLCChannelH_ChannelModelingSlides(params, TP1
 
 
     %% ============================================================
-    %   Componente NLOS - primeira reflexão
+    %  5. Componente NLOS - primeira reflexao
     % =============================================================
-    %
-    % Mantemos a parede do código original:
-    %
-    %   WP = [-lx/2, y(kk), z(ll)]
-    %
-    % Como lx = params.room(1), usamos:
-    %
-    %   -params.room(1)/2
 
-    if params.includeNLOS
+            if params.includeNLOS
+                %Discretização das paredes 
+                walls = discretizeReflectiveWalls_ChannelModelingSlides(params);
 
-            lx = params.room(1);
-            ly = params.room(2);
-            lz = params.room(3);
+                for iWall = 1:length(walls)
 
-            %% Parede 1: x = -lx/2
+                    wall = walls(iWall);
 
-            dA_xwall = ly*lz/(Ny*Nz);
+                    for iPatch = 1:size(wall.points, 1)
 
-            for kk = 1:Ny
-                for ll = 1:Nz
+                        WP = wall.points(iPatch,:);
 
-                    WP = [-lx/2, y(kk), z(ll)];
+                        h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
+                            h_vector, ...
+                            params, ...
+                            TP1, ...
+                            RP, ...
+                            WP, ...
+                            wall.normal, ...
+                            wall.dA, ...
+                            m, ...
+                            FOV, ...
+                            G_Con, ...
+                            nTx, ...
+                            nRx);
 
-                    h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
-                        h_vector, params, TP1, RP, WP, dA_xwall, m, FOV,G_Con, "x");
-
-                end
-            end
-
-
-            %% Parede 2: x = +lx/2
-
-            for kk = 1:Ny
-                for ll = 1:Nz
-
-                    WP = [lx/2, y(kk), z(ll)];
-
-                    h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
-                        h_vector, params, TP1, RP, WP, dA_xwall, m, FOV,G_Con, "x");
+                    end
 
                 end
+
             end
-
-
-            %% Parede 3: y = -ly/2
-
-            dA_ywall = lx*lz/(Nx*Nz);
-
-            for kk = 1:Nx
-                for ll = 1:Nz
-
-                    WP = [x(kk), -ly/2, z(ll)];
-
-                    h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
-                        h_vector, params, TP1, RP, WP, dA_ywall, m, FOV,G_Con, "y");
-
-                end
-            end
-
-
-            %% Parede 4: y = +ly/2
-
-            for kk = 1:Nx
-                for ll = 1:Nz
-
-                    WP = [x(kk), ly/2, z(ll)];
-
-                    h_vector = addSingleNLOSPath_ChannelModelingSlides( ...
-                        h_vector, params, TP1, RP, WP, dA_ywall, m, FOV, G_Con,"y");
-
-                end
-            end
-     end
-
 
     %% ============================================================
     %   Corte dos zeros iniciais e finais
