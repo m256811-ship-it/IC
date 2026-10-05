@@ -218,7 +218,7 @@ Essa escolha será particularmente importante quando forem comparadas posições
 
 Atualmente, a energia utilizada para definir o nível de ruído é calculada antes da aplicação do canal:
 
-$E_b = \operatorname{mean}(x_{\text{Tx}}^2)$.
+$E_b = \mathrm{mean}(x_{\text{Tx}}^2)$.
 
 Essa definição deverá ser revisada de acordo com o objetivo de cada experimento.
 
@@ -278,16 +278,6 @@ Após a estabilização do modelo físico, os experimentos deverão ser realizad
 ---
 
 ## 5. Questão central de investigação
-
-A evolução do modelo deverá permitir separar três efeitos principais:
-
-\[
-\boxed{\text{Atenuação}}
-\qquad
-\boxed{\text{Multipercurso / ISI}}
-\qquad
-\boxed{\text{Variabilidade espacial}}
-\]
 
 O objetivo final será determinar em quais condições o receptor baseado em rede neural apresenta vantagem em relação às técnicas convencionais.
 
