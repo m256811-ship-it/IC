@@ -1,0 +1,39 @@
+function data = generateReceiverDataset( ...
+    h, Lwin, Nbits, EbNo_dB, decoderParams)
+% GENERATERECEIVERDATASET
+%
+% Gera bits aleatorios, aplica OOK, canal FIR e AWGN,
+% e constroi as janelas usadas pelo receptor neural.
+
+%% Bits
+
+data.bits = randi([0 1], Nbits, 1);
+
+%% Modulacao OOK
+
+data.x = ookMod( ...
+    data.bits, ...
+    decoderParams.A);
+
+%% Canal FIR
+
+data.yClean = filter( ...
+    h, ...
+    1, ...
+    data.x);
+
+%% AWGN
+
+data.y = addAwgnFromEbNo( ...
+    data.yClean, ...
+    data.x, ...
+    EbNo_dB);
+
+%% Janelas
+
+[data.X, data.Y] = makeVLCWindows( ...
+    data.y, ...
+    data.bits, ...
+    Lwin);
+
+end
